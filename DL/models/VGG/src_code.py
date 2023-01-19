@@ -3,7 +3,7 @@ import gc
 import numpy as np
 import torch
 import torch.nn as nn
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 from torchvision import datasets
 from torchvision import transforms
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -17,6 +17,8 @@ torch.cuda.empty_cache()
 
 def data_loader(data_dir, batch_size, random_seed=42,
                 valid_size=0.1, shuffle=True, test=False):
+    gc.collect()
+    torch.cuda.empty_cache()
     # R, G, B channels
     normalize = transforms.Normalize(
         mean=[0.4914, 0.4822, 0.4465],
@@ -66,11 +68,11 @@ def data_loader(data_dir, batch_size, random_seed=42,
     valid_sampler = SubsetRandomSampler(valid_idx)
 
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=batch_size, sampler=train_sampler
+        train_dataset, num_workers=4, batch_size=batch_size, sampler=train_sampler, pin_memory=True
     )
 
     valid_loader = torch.utils.data.DataLoader(
-        valid_dataset, batch_size=batch_size, sampler=valid_sampler
+        valid_dataset, num_workers=4, batch_size=batch_size, sampler=valid_sampler, pin_memory=True
     )
     return train_loader, valid_loader
 
@@ -86,63 +88,63 @@ class VGG16(nn.Module):
         super(VGG16, self).__init__()
         self.layer1 = nn.Sequential(
             # input channel, output channel(kernel, random init)
-            nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU())
         # 64 dim
         self.layer2 = nn.Sequential(
-            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2))
         self.layer3 = nn.Sequential(
-            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(128),
             nn.ReLU())
         # 128 dim
         self.layer4 = nn.Sequential(
-            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(128),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2))
         self.layer5 = nn.Sequential(
-            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(256),
             nn.ReLU())
         # 256 dim
         self.layer6 = nn.Sequential(
-            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(256),
             nn.ReLU())
         self.layer7 = nn.Sequential(
-            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(256),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2))
         self.layer8 = nn.Sequential(
-            nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(512),
             nn.ReLU())
         # 512 dim
         self.layer9 = nn.Sequential(
-            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(512),
             nn.ReLU())
         self.layer10 = nn.Sequential(
-            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(512),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2))
         self.layer11 = nn.Sequential(
-            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(512),
             nn.ReLU())
         self.layer12 = nn.Sequential(
-            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(512),
             nn.ReLU())
         self.layer13 = nn.Sequential(
-            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(512),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2))
@@ -158,6 +160,8 @@ class VGG16(nn.Module):
             nn.Linear(4096, num_classes))
 
     def forward(self, x):
+        gc.collect()
+        torch.cuda.empty_cache()
         out = self.layer1(x)
         out = self.layer2(out)
         out = self.layer3(out)
@@ -178,10 +182,8 @@ class VGG16(nn.Module):
         return out
 
 
-torch.cuda.empty_cache()
 num_classes = 100
-num_epochs = 20
-batch_size = 16
+num_epochs = 10
 learning_rate = 0.005
 
 gc.collect()
@@ -194,22 +196,24 @@ optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, weight_decay=0
 
 # Train the model
 total_step = len(train_loader)
-target_epoch = 2
 
 for epoch in range(num_epochs):
-    if epoch == target_epoch:
-        break
     for i, (images, labels) in tqdm(enumerate(train_loader), total=total_step):
         # Move tensors to the configured device
         images = images.to(device)
         labels = labels.to(device)
 
         # Forward pass
+        gc.collect()
+        torch.cuda.empty_cache()
         outputs = model(images)
         loss = criterion(outputs, labels)
 
         # Backward and optimize
-        optimizer.zero_grad()
+        # optimizer.zero_grad()
+        for param in model.parameters():
+            param.grad = None
+
         loss.backward()
         optimizer.step()
 
@@ -239,6 +243,8 @@ with torch.no_grad():
     for images, labels in test_loader:
         images = images.to(device)
         labels = labels.to(device)
+        gc.collect()
+        torch.cuda.empty_cache()
         outputs = model(images)
         _, predicted = torch.max(outputs.data, 1)
         total += labels.size(0)

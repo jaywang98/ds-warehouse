@@ -53,17 +53,17 @@ def data_loader(data_dir, batch_size, random_seed=42,
     )
 
     indices = np.arange(len(train_dataset))
-    train_indices, test_indices = train_test_split(indices, train_size=3000, stratify=train_dataset.targets)
+    train_indices, test_indices = train_test_split(indices, train_size=10000, stratify=train_dataset.targets)
     train_dataset = torch.utils.data.Subset(train_dataset, train_indices)
-    train_loader = torch.utils.data.DataLoader(train_dataset, shuffle=True, num_workers=16, batch_size=8)
-    valid_loader = torch.utils.data.DataLoader(train_dataset, shuffle=False, num_workers=16, batch_size=8)
+    train_loader = torch.utils.data.DataLoader(train_dataset, shuffle=True, num_workers=16, batch_size=batch_size)
+    valid_loader = torch.utils.data.DataLoader(train_dataset, shuffle=False, num_workers=16, batch_size=batch_size)
     return train_loader, valid_loader
 
 
 # CIFAR-100 dataset
-train_loader, valid_loader = data_loader(data_dir='./data', batch_size=16)
+train_loader, valid_loader = data_loader(data_dir='./data', batch_size=8)
 
-test_loader = data_loader(data_dir='./data', batch_size=16, test=True)
+test_loader = data_loader(data_dir='./data', batch_size=8, test=True)
 
 
 class VGG16(nn.Module):
@@ -166,7 +166,7 @@ class VGG16(nn.Module):
 
 
 num_classes = 100
-num_epochs = 10
+num_epochs = 20
 learning_rate = 0.005
 
 gc.collect()
@@ -179,6 +179,8 @@ optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, weight_decay=0
 
 # Train the model
 total_step = len(train_loader)
+print(total_step)
+
 
 for epoch in range(num_epochs):
     for i, (images, labels) in tqdm(enumerate(train_loader), total=total_step):
